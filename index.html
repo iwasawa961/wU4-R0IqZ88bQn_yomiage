@@ -1,0 +1,711 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Excel 数字読み上げ</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #202124;
+      --muted: #646a73;
+      --line: #d8dde6;
+      --panel: #ffffff;
+      --soft: #f4f7fb;
+      --accent: #0f766e;
+      --accent-strong: #0b5f59;
+      --warn: #a15c00;
+      --focus: #f59e0b;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Segoe UI", "Yu Gothic UI", Meiryo, sans-serif;
+      background: linear-gradient(180deg, #f7fafc 0%, #edf2f7 100%);
+      color: var(--ink);
+      min-height: 100vh;
+    }
+
+    main {
+      width: min(1120px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 28px 0 36px;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: 20px;
+      margin-bottom: 18px;
+    }
+
+    h1 {
+      margin: 0;
+      font-size: clamp(24px, 3vw, 38px);
+      line-height: 1.15;
+      letter-spacing: 0;
+    }
+
+    .status {
+      min-width: 220px;
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      background: var(--panel);
+      color: var(--muted);
+      font-size: 14px;
+      text-align: right;
+    }
+
+    .workspace {
+      display: grid;
+      grid-template-columns: 360px 1fr;
+      gap: 16px;
+      align-items: start;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 16px;
+      box-shadow: 0 12px 28px rgba(31, 41, 55, 0.08);
+    }
+
+    .controls {
+      display: grid;
+      gap: 14px;
+    }
+
+    label {
+      display: grid;
+      gap: 6px;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    input,
+    select,
+    button {
+      font: inherit;
+    }
+
+    input[type="file"],
+    input[type="text"],
+    select {
+      width: 100%;
+      min-height: 42px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fff;
+      color: var(--ink);
+      padding: 8px 10px;
+    }
+
+    input[type="text"] {
+      text-transform: uppercase;
+    }
+
+    .row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 4px;
+    }
+
+    button {
+      min-height: 44px;
+      border: 1px solid var(--accent);
+      border-radius: 6px;
+      background: var(--accent);
+      color: #fff;
+      font-weight: 700;
+      cursor: pointer;
+    }
+
+    button.secondary {
+      background: #fff;
+      color: var(--accent);
+    }
+
+    button:disabled {
+      border-color: var(--line);
+      background: #e8edf3;
+      color: #89919d;
+      cursor: not-allowed;
+    }
+
+    button:not(:disabled):hover {
+      background: var(--accent-strong);
+      color: #fff;
+    }
+
+    .hint {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.55;
+      margin: 0;
+    }
+
+    .reader {
+      display: grid;
+      grid-template-rows: auto auto 1fr;
+      min-height: 560px;
+      gap: 14px;
+    }
+
+    .now {
+      display: grid;
+      grid-template-columns: minmax(84px, auto) 1fr;
+      gap: 12px;
+      align-items: stretch;
+    }
+
+    .cell {
+      display: grid;
+      place-items: center;
+      border: 2px solid var(--accent);
+      border-radius: 8px;
+      background: #ecfdf5;
+      color: var(--accent-strong);
+      font-size: 30px;
+      font-weight: 800;
+      min-height: 88px;
+      padding: 8px;
+    }
+
+    .value {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      min-height: 88px;
+      padding: 14px 16px;
+      display: grid;
+      align-content: center;
+      gap: 4px;
+      overflow-wrap: anywhere;
+    }
+
+    .value strong {
+      font-size: clamp(24px, 4vw, 48px);
+      line-height: 1.1;
+    }
+
+    .value span {
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    .meter {
+      display: grid;
+      grid-template-columns: 1fr auto;
+      gap: 10px;
+      align-items: center;
+      color: var(--muted);
+      font-size: 14px;
+    }
+
+    progress {
+      width: 100%;
+      height: 12px;
+      accent-color: var(--accent);
+    }
+
+    .list {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      overflow: auto;
+      background: #fff;
+      min-height: 260px;
+      max-height: 440px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+    }
+
+    th,
+    td {
+      padding: 9px 10px;
+      border-bottom: 1px solid #edf0f4;
+      text-align: left;
+      overflow-wrap: anywhere;
+      font-size: 14px;
+    }
+
+    th {
+      position: sticky;
+      top: 0;
+      background: var(--soft);
+      color: var(--muted);
+      z-index: 1;
+    }
+
+    tr.active {
+      outline: 2px solid var(--focus);
+      outline-offset: -2px;
+      background: #fff8e6;
+    }
+
+    .message {
+      padding: 12px;
+      border: 1px solid #f6c66b;
+      background: #fff8e6;
+      color: var(--warn);
+      border-radius: 6px;
+      font-size: 14px;
+      line-height: 1.5;
+    }
+
+    @media (max-width: 860px) {
+      header,
+      .workspace,
+      .now {
+        grid-template-columns: 1fr;
+      }
+
+      header {
+        align-items: stretch;
+      }
+
+      .status {
+        text-align: left;
+      }
+    }
+
+    @media (max-width: 520px) {
+      main {
+        width: min(100% - 20px, 1120px);
+        padding-top: 18px;
+      }
+
+      .row,
+      .actions {
+        grid-template-columns: 1fr;
+      }
+
+      .reader {
+        min-height: auto;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div>
+        <h1>Excel 数字読み上げ</h1>
+      </div>
+      <div class="status" id="status">Excelファイルを選択してください</div>
+    </header>
+
+    <section class="workspace">
+      <aside class="panel controls">
+        <label>
+          Excelファイル
+          <input id="fileInput" type="file" accept=".xlsx,.xls,.xlsm,.csv">
+        </label>
+
+        <label>
+          シート
+          <select id="sheetSelect" disabled></select>
+        </label>
+
+        <div class="row">
+          <label>
+            開始セル
+            <input id="startCell" type="text" value="D9" inputmode="latin" autocomplete="off">
+          </label>
+
+          <label>
+            方向
+            <select id="direction">
+              <option value="col">1列 下方向</option>
+              <option value="row">1行 右方向</option>
+            </select>
+          </label>
+        </div>
+
+        <label>
+          音声
+          <select id="voiceSelect"></select>
+        </label>
+
+        <label>
+          読み上げ速度
+          <select id="rateSelect">
+            <option value="0.75">ゆっくり</option>
+            <option value="0.9" selected>標準</option>
+            <option value="1.05">少し速い</option>
+          </select>
+        </label>
+
+        <div class="actions">
+          <button id="loadRange" disabled>範囲をセット</button>
+          <button id="readNext" disabled>読み上げ / 次へ</button>
+          <button id="readAgain" class="secondary" disabled>もう一度</button>
+          <button id="stop" class="secondary" disabled>停止</button>
+        </div>
+
+        <p class="hint">Enterキーで次のセルを読み上げます。空白セルは一覧に入れず、数字は桁ごとに読みます。</p>
+        <div class="message" id="libraryMessage" hidden></div>
+      </aside>
+
+      <section class="panel reader">
+        <div class="now">
+          <div class="cell" id="currentCell">--</div>
+          <div class="value">
+            <strong id="currentValue">未選択</strong>
+            <span id="spokenValue">読み上げる内容がここに表示されます</span>
+          </div>
+        </div>
+
+        <div class="meter">
+          <progress id="progress" value="0" max="1"></progress>
+          <span id="count">0 / 0</span>
+        </div>
+
+        <div class="list">
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 120px;">セル</th>
+                <th>値</th>
+                <th>読み</th>
+              </tr>
+            </thead>
+            <tbody id="rows">
+              <tr><td colspan="3">まだ範囲がセットされていません</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <script>
+    function loadSheetJsFallback() {
+      const message = document.getElementById("libraryMessage");
+      message.hidden = false;
+      message.textContent = "Excel読み込みライブラリを読み込んでいます。オフラインで使う場合は xlsx.full.min.js をこのHTMLと同じフォルダに置いてください。";
+      const script = document.createElement("script");
+      script.src = "https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js";
+      script.onload = () => {
+        message.hidden = true;
+        window.dispatchEvent(new Event("sheetjs-ready"));
+      };
+      script.onerror = () => {
+        message.textContent = "Excel読み込みライブラリを読み込めませんでした。ネット接続を確認するか、xlsx.full.min.js をこのHTMLと同じフォルダに置いてください。";
+      };
+      document.head.appendChild(script);
+    }
+  </script>
+  <script src="./xlsx.full.min.js" onload="window.dispatchEvent(new Event('sheetjs-ready'))" onerror="loadSheetJsFallback()"></script>
+  <script>
+    const fileInput = document.getElementById("fileInput");
+    const sheetSelect = document.getElementById("sheetSelect");
+    const startCell = document.getElementById("startCell");
+    const direction = document.getElementById("direction");
+    const voiceSelect = document.getElementById("voiceSelect");
+    const rateSelect = document.getElementById("rateSelect");
+    const loadRange = document.getElementById("loadRange");
+    const readNext = document.getElementById("readNext");
+    const readAgain = document.getElementById("readAgain");
+    const stopButton = document.getElementById("stop");
+    const status = document.getElementById("status");
+    const currentCell = document.getElementById("currentCell");
+    const currentValue = document.getElementById("currentValue");
+    const spokenValue = document.getElementById("spokenValue");
+    const progress = document.getElementById("progress");
+    const count = document.getElementById("count");
+    const rows = document.getElementById("rows");
+
+    let workbook = null;
+    let activeItems = [];
+    let activeIndex = -1;
+    let hasSpokenCurrent = false;
+    let sheetJsReady = false;
+
+    const digitJa = {
+      "0": "ぜろ",
+      "1": "いち",
+      "2": "に",
+      "3": "さん",
+      "4": "よん",
+      "5": "ご",
+      "6": "ろく",
+      "7": "なな",
+      "8": "はち",
+      "9": "きゅう"
+    };
+
+    function setStatus(text) {
+      status.textContent = text;
+    }
+
+    function normalizeCellAddress(value) {
+      const match = String(value).trim().toUpperCase().match(/^([A-Z]+)([1-9][0-9]*)$/);
+      if (!match) return null;
+      return {
+        c: XLSX.utils.decode_col(match[1]),
+        r: Number(match[2]) - 1
+      };
+    }
+
+    function displayValue(cell) {
+      if (!cell) return "";
+      if (cell.w !== undefined && cell.w !== null) return String(cell.w);
+      if (cell.v !== undefined && cell.v !== null) return String(cell.v);
+      return "";
+    }
+
+    function isBlank(text) {
+      return String(text).trim() === "";
+    }
+
+    function toSpoken(text) {
+      const source = String(text);
+      const parts = [];
+      for (const char of source) {
+        if (digitJa[char]) {
+          parts.push(digitJa[char]);
+        } else if (char === "-") {
+          parts.push("マイナス");
+        } else if (char === ".") {
+          parts.push("てん");
+        } else if (char === ",") {
+          parts.push("、");
+        } else if (char === "¥" || char === "\\" || char === "￥") {
+          parts.push("");
+        } else if (char === "$") {
+          parts.push("");
+        } else if (char === "%") {
+          parts.push("パーセント");
+        } else if (!/\s/.test(char)) {
+          parts.push(char);
+        }
+      }
+      return parts.filter(Boolean).join("、").replace(/、+/g, "、").replace(/^、|、$/g, "");
+    }
+
+    function populateVoices() {
+      const voices = speechSynthesis.getVoices();
+      const previous = voiceSelect.value;
+      voiceSelect.innerHTML = "";
+      const japanese = voices.filter((voice) => voice.lang && voice.lang.toLowerCase().startsWith("ja"));
+      const candidates = japanese.length ? japanese : voices;
+      for (const voice of candidates) {
+        const option = document.createElement("option");
+        option.value = voice.name;
+        option.textContent = `${voice.name} (${voice.lang})`;
+        voiceSelect.appendChild(option);
+      }
+      if (previous) voiceSelect.value = previous;
+    }
+
+    function getSelectedVoice() {
+      const voices = speechSynthesis.getVoices();
+      return voices.find((voice) => voice.name === voiceSelect.value) ||
+        voices.find((voice) => voice.lang && voice.lang.toLowerCase().startsWith("ja")) ||
+        voices[0] ||
+        null;
+    }
+
+    function speak(text) {
+      if (!text) return;
+      speechSynthesis.cancel();
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = "ja-JP";
+      utterance.rate = Number(rateSelect.value);
+      const voice = getSelectedVoice();
+      if (voice) utterance.voice = voice;
+      speechSynthesis.speak(utterance);
+      stopButton.disabled = false;
+    }
+
+    function renderList() {
+      rows.innerHTML = "";
+      if (!activeItems.length) {
+        rows.innerHTML = '<tr><td colspan="3">読み上げ対象がありません</td></tr>';
+        return;
+      }
+
+      const fragment = document.createDocumentFragment();
+      activeItems.forEach((item, index) => {
+        const tr = document.createElement("tr");
+        if (index === activeIndex) tr.className = "active";
+        tr.innerHTML = `<td>${item.address}</td><td>${escapeHtml(item.value)}</td><td>${escapeHtml(item.spoken)}</td>`;
+        fragment.appendChild(tr);
+      });
+      rows.appendChild(fragment);
+      const activeRow = rows.querySelector("tr.active");
+      if (activeRow) activeRow.scrollIntoView({ block: "nearest" });
+    }
+
+    function escapeHtml(value) {
+      return String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    function updateCurrent() {
+      const total = activeItems.length;
+      const item = activeItems[activeIndex];
+      currentCell.textContent = item ? item.address : "--";
+      currentValue.textContent = item ? item.value : "未選択";
+      spokenValue.textContent = item ? item.spoken : "読み上げる内容がここに表示されます";
+      progress.max = Math.max(total, 1);
+      progress.value = item ? activeIndex + 1 : 0;
+      count.textContent = item ? `${activeIndex + 1} / ${total}` : `0 / ${total}`;
+      readNext.disabled = total === 0;
+      readAgain.disabled = !item;
+      renderList();
+    }
+
+    function buildRange() {
+      if (!workbook) return;
+      const start = normalizeCellAddress(startCell.value);
+      if (!start) {
+        setStatus("開始セルを A1 形式で入力してください");
+        return;
+      }
+
+      const ws = workbook.Sheets[sheetSelect.value];
+      const ref = ws && ws["!ref"] ? XLSX.utils.decode_range(ws["!ref"]) : null;
+      if (!ref) {
+        activeItems = [];
+        activeIndex = -1;
+        updateCurrent();
+        setStatus("シートに値がありません");
+        return;
+      }
+
+      const items = [];
+      const end = direction.value === "col" ? ref.e.r : ref.e.c;
+      for (let i = direction.value === "col" ? start.r : start.c; i <= end; i++) {
+        const address = direction.value === "col"
+          ? XLSX.utils.encode_cell({ r: i, c: start.c })
+          : XLSX.utils.encode_cell({ r: start.r, c: i });
+        const value = displayValue(ws[address]);
+        if (!isBlank(value)) {
+          items.push({ address, value, spoken: toSpoken(value) });
+        }
+      }
+
+      activeItems = items;
+      activeIndex = items.length ? 0 : -1;
+      hasSpokenCurrent = false;
+      updateCurrent();
+      setStatus(`${items.length}件をセットしました`);
+    }
+
+    function readCurrentOrNext() {
+      if (!activeItems.length) return;
+      if (activeIndex < 0) {
+        activeIndex = 0;
+      } else if (hasSpokenCurrent && activeIndex < activeItems.length - 1) {
+        activeIndex += 1;
+      }
+      hasSpokenCurrent = true;
+      updateCurrent();
+      speak(activeItems[activeIndex].spoken);
+      setStatus(activeIndex + 1 === activeItems.length ? "最後のセルです" : "読み上げ中");
+    }
+
+    function readAgainCurrent() {
+      const item = activeItems[activeIndex];
+      if (!item) return;
+      speak(item.spoken);
+      setStatus("もう一度読み上げています");
+    }
+
+    function handleFile(file) {
+      if (!sheetJsReady || !window.XLSX) {
+        setStatus("Excel読み込みライブラリの準備中です");
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        try {
+          workbook = XLSX.read(event.target.result, { type: "array", cellText: true, cellDates: false });
+          sheetSelect.innerHTML = "";
+          workbook.SheetNames.forEach((name) => {
+            const option = document.createElement("option");
+            option.value = name;
+            option.textContent = name;
+            sheetSelect.appendChild(option);
+          });
+          sheetSelect.disabled = false;
+          loadRange.disabled = false;
+          activeItems = [];
+          activeIndex = -1;
+          hasSpokenCurrent = false;
+          updateCurrent();
+          setStatus(`${file.name} を読み込みました`);
+        } catch (error) {
+          workbook = null;
+          setStatus("Excelファイルを読み込めませんでした");
+          console.error(error);
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    }
+
+    window.addEventListener("sheetjs-ready", () => {
+      sheetJsReady = true;
+      if (fileInput.files[0]) handleFile(fileInput.files[0]);
+    });
+
+    fileInput.addEventListener("change", () => {
+      const file = fileInput.files[0];
+      if (file) handleFile(file);
+    });
+
+    loadRange.addEventListener("click", buildRange);
+    sheetSelect.addEventListener("change", buildRange);
+    direction.addEventListener("change", () => workbook && buildRange());
+    startCell.addEventListener("change", () => workbook && buildRange());
+    readNext.addEventListener("click", readCurrentOrNext);
+    readAgain.addEventListener("click", readAgainCurrent);
+    stopButton.addEventListener("click", () => {
+      speechSynthesis.cancel();
+      stopButton.disabled = true;
+      setStatus("停止しました");
+    });
+
+    document.addEventListener("keydown", (event) => {
+      const tag = document.activeElement && document.activeElement.tagName;
+      const isTyping = tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA";
+      if (event.key === "Enter" && !isTyping) {
+        event.preventDefault();
+        readCurrentOrNext();
+      }
+    });
+
+    if ("speechSynthesis" in window) {
+      populateVoices();
+      speechSynthesis.onvoiceschanged = populateVoices;
+    } else {
+      setStatus("このブラウザは読み上げに対応していません");
+      readNext.disabled = true;
+      readAgain.disabled = true;
+    }
+  </script>
+</body>
+</html>
